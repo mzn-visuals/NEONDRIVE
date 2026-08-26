@@ -1,0 +1,19 @@
+.settings-body {
+  width: 100%; display: flex; flex-direction: column; gap: 16px;
+}
+.set-row { display: grid; grid-template-columns: 170px 1fr; align-items: center; gap: 16px; }
+.set-row label { font-size: 13px; letter-spacing: .22em; color: #cbbcf5; text-transform: uppercase; }
+.set-row select, .set-row input[type="text"] {
+  padding: 10px 12px; background: rgba(255,255,255,.05); color: #fff;
+  border: 1px solid #ffffff2a; outline: none; font-size: 14px; letter-spacing: .06em; width: 100%;
+}
+.set-row select:focus, .set-row input:focus { border-color: var(--accent-1); }
+.set-row input[type="checkbox"] { width: 20px; height: 20px; accent-color: var(--neon-pink); justify-self: start; }
+.set-note { font-size: 12.5px; color: #8f7fc0; line-height: 1.6; letter-spacing: .04em; }
+.set-note code { color: var(--accent-2); background: rgba(41,230,255,.08); padding: 2px 7px; }
+
+input[type="range"] { -webkit-appearance: none; appearance: none; height: 6px; background: linear-gradient(90deg, var(--accent-2), var(--accent-1)); border-radius: 3px; }
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none; appearance: none; width: 18px; height: 18px; border-radius: 50%;
+  background: #fff; box-shadow: 0 0 12px var(--accent-1); cursor: pointer;
+}

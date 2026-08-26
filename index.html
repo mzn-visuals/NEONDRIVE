@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>NEON//DRIVE</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;900&family=Rajdhani:wght@500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/main.css">
+<link rel="stylesheet" href="css/menu.css">
+<link rel="stylesheet" href="css/hud.css">
+<link rel="stylesheet" href="css/settings.css">
+<script>window.ND = window.ND || {};</script>
+</head>
+<body>
+<canvas id="gl"></canvas>
+<div id="fxVignette"></div>
+<div id="fxScanlines"></div>
+<div id="flashOverlay"></div>
+
+<div id="hud" class="hidden">
+  <div id="hudSong">
+    <img id="hudThumb" alt="">
+    <div><div id="hudTitle">—</div><div id="hudArtist">—</div></div>
+  </div>
+  <div id="hudScoreChip">
+    <span id="hudScore">0</span>
+    <span id="hudCombo"><b id="comboNum">0</b><i id="comboMult">×1.0</i></span>
+  </div>
+  <div id="hudCluster">
+    <canvas id="speedoAnalog" width="300" height="300"></canvas>
+  </div>
+  <div id="hudDrift" class="hidden">DRIFT <span id="driftPts">0</span></div>
+  <div id="judgeLayer"></div>
+  <div id="progressWrap"><div id="progressFill"></div><div id="wormMark"></div></div>
+</div>
+
+<div id="screens">
+
+  <section id="screenMain" class="screen">
+    <div class="mm-scrim"></div>
+    <header class="mm-brand">
+      <h1 class="logo">NEON<span class="logo-sep">//</span>DRIVE</h1>
+      <div class="logo-sub">A PLAYABLE MUSIC VIDEO</div>
+    </header>
+    <nav class="main-menu">
+      <button class="mm-btn primary" data-nav="music"><i>01</i><span>DRIVE</span><em>Pick a track · hit the road</em></button>
+      <button class="mm-btn" data-nav="coop"><i>02</i><span>CO-OP</span><em>Shared universe · 2–4 drivers</em></button>
+      <button class="mm-btn" data-nav="cars"><i>03</i><span>GARAGE</span><em>Choose your machine</em></button>
+      <button class="mm-btn" data-nav="worlds"><i>04</i><span>WORLDS</span><em>Level · time · weather</em></button>
+      <button class="mm-btn" data-nav="settings"><i>05</i><span>SETTINGS</span><em>Camera · quality · audio</em></button>
+    </nav>
+    <footer class="mm-foot">
+      <div class="mm-keys">
+        <b>W A S D</b><span>drive</span>
+        <b>SPACE</b><span>drift</span>
+        <b>SHIFT</b><span>nitro</span>
+        <b>C</b><span>camera</span>
+        <b>ESC</b><span>pause</span>
+      </div>
+      <div class="menu-hint" id="proxyStatus">SCANNING FOR MUSIC SERVICE…</div>
+    </footer>
+  </section>
+
+  <section id="screenMusic" class="screen panel-screen hidden">
+    <div class="panel-drawer">
+    <header class="panel-head">
+      <button class="back-btn" data-nav="main">&#9664;</button>
+      <h2>MUSIC</h2>
+      <div class="mode-chips" id="modeChips">
+        <button data-mode="single" class="chip sel">SINGLE</button>
+        <button data-mode="infinite" class="chip">INFINITE MIX</button>
+        <button data-mode="radio" class="chip">RADIO DRIVE</button>
+      </div>
+    </header>
+    <div class="search-row">
+      <input id="searchInput" type="text" placeholder="Search a song, or paste a YouTube / YouTube Music link…" autocomplete="off" spellcheck="false">
+      <button id="oskToggle" class="neon-btn ghost" title="On-screen keyboard">&#9000;</button>
+      <button id="searchBtn" class="neon-btn">SEARCH</button>
+      <button id="localFileBtn" class="neon-btn ghost">LOCAL FILE</button>
+    </div>
+    <div id="osk" class="hidden">
+      <div class="osk-row" data-row="abc1"></div>
+      <div class="osk-row" data-row="abc2"></div>
+      <div class="osk-row" data-row="num"></div>
+      <div class="osk-row">
+        <button class="osk-key wide" data-k=" ">SPACE</button>
+        <button class="osk-key wide" data-k="BACK">BACK</button>
+        <button class="osk-key wide" data-k="CLEAR">CLEAR</button>
+        <button class="osk-key wide accent" data-k="SEARCH">SEARCH</button>
+      </div>
+    </div>
+    <div id="searchStatus" class="status-line"></div>
+    <div id="resultsWrap">
+      <div id="queuePreview" class="hidden">
+        <div class="qp-label">UP NEXT</div>
+        <div id="queueList"></div>
+      </div>
+      <div id="searchResults"></div>
+    </div>
+    <footer class="panel-foot">
+      <div id="pickedTrack" class="picked-track hidden">
+        <img id="pickedThumb" alt=""><div><div id="pickedTitle"></div><div id="pickedArtist"></div></div>
+      </div>
+      <button id="driveBtn" class="drive-btn hidden">START ENGINE &#9654;</button>
+    </footer>
+  
+    </div>
+  </section>
+
+  <section id="screenCars" class="screen panel-screen hidden">
+    <div class="panel-drawer">
+    <header class="panel-head"><button class="back-btn" data-nav="main">&#9664;</button><h2>GARAGE</h2></header>
+    <div class="showroom-info">
+      <button id="carPrev" class="arrow-btn">&#9664;</button>
+      <div class="car-card">
+        <h3 id="carName">NEON GT</h3>
+        <div class="stat"><label>MAX SPEED</label><div class="bar"><div id="statSpeed" class="fill"></div></div><span id="statSpeedVal">280</span></div>
+        <div class="stat"><label>ACCELERATION</label><div class="bar"><div id="statAccel" class="fill"></div></div><span>&nbsp;</span></div>
+        <div class="stat"><label>HANDLING</label><div class="bar"><div id="statHandling" class="fill"></div></div><span>&nbsp;</span></div>
+        <p id="carDesc" class="car-desc"></p>
+      </div>
+      <button id="carNext" class="arrow-btn">&#9654;</button>
+    </div>
+    <footer class="panel-foot"><button class="neon-btn" data-nav="music">SELECT &amp; BACK</button></footer>
+  
+    </div>
+  </section>
+
+  <section id="screenWorlds" class="screen panel-screen hidden">
+    <div class="panel-drawer">
+    <header class="panel-head"><button class="back-btn" data-nav="main">&#9664;</button><h2>WORLDS</h2></header>
+    <div class="world-grid" id="worldGrid"></div>
+    <div class="opt-group"><div class="opt-label">TIME OF DAY</div><div class="chips" id="timeChips"></div></div>
+    <div class="opt-group"><div class="opt-label">WEATHER</div><div class="chips" id="weatherChips"></div></div>
+    <footer class="panel-foot"><button class="neon-btn" data-nav="music">CONFIRM &amp; BACK</button></footer>
+  
+    </div>
+  </section>
+
+  <section id="screenSettings" class="screen panel-screen hidden">
+    <div class="panel-drawer">
+    <header class="panel-head"><button class="back-btn" data-nav="main">&#9664;</button><h2>SETTINGS</h2></header>
+    <div class="settings-body">
+      <div class="set-row"><label>Volume</label><input id="volSlider" type="range" min="0" max="100" value="80"></div>
+      <div class="set-row"><label>Quality</label>
+        <select id="qualitySel"><option value="low">LOW</option><option value="medium" selected>MEDIUM</option><option value="high">HIGH</option></select></div>
+      <div class="set-row"><label>Difficulty</label>
+        <select id="difficultySel"><option value="easy">EASY</option><option value="normal" selected>NORMAL</option><option value="hard">HARD</option></select></div>
+      <div class="set-row"><label>Lyrics</label><input id="lyricsToggle" type="checkbox" checked></div>
+      <div class="set-row"><label>Camera</label>
+        <select id="cameraSel"><option value="chase">CHASE</option><option value="close">CLOSE CHASE</option><option value="far">FAR CHASE</option><option value="hood">HOOD</option><option value="cockpit">COCKPIT</option><option value="front">FRONT</option><option value="rear">REAR</option></select></div>
+      <div class="set-row"><label>Camera shake</label>
+        <select id="shakeSel"><option value="0">OFF</option><option value="0.5">LOW</option><option value="1" selected>MEDIUM</option><option value="1.6">HIGH</option></select></div>
+      <div class="set-row"><label>FOV scale</label><input id="fovSlider" type="range" min="60" max="140" value="100"></div>
+      <div class="set-row"><label>Music service URL</label><input id="proxyInput" type="text" placeholder="https://proxy.crt-audio.cc.cd"></div>
+      <div class="set-note">Uses your hosted music service at <code>proxy.crt-audio.cc.cd</code> by default — override here to self-host. Local files always work without it.</div>
+    </div>
+  
+    </div>
+  </section>
+
+  <section id="screenCoop" class="screen panel-screen hidden">
+    <div class="panel-drawer">
+    <header class="panel-head"><button class="back-btn" data-nav="main">&#9664;</button><h2>CO-OP DRIVE</h2></header>
+    <div class="coop-body">
+      <div class="coop-status" id="coopStatus">Connect to the co-op server to drive with friends. Same song, same world, same beat — ghost cars, team combos, shared wormholes.</div>
+      <div class="coop-actions" id="coopActions">
+        <button id="coopHostBtn" class="neon-btn">HOST A RUN</button>
+        <div class="coop-join">
+          <input id="coopCodeInput" type="text" maxlength="4" placeholder="CODE">
+          <button id="coopJoinBtn" class="neon-btn ghost">JOIN</button>
+        </div>
+      </div>
+      <div class="coop-room hidden" id="coopRoom">
+        <div class="coop-code">ROOM <span id="coopCode">----</span></div>
+        <div id="coopPlayers" class="coop-players"></div>
+        <div class="coop-note" id="coopNote"></div>
+        <button id="coopLeaveBtn" class="neon-btn ghost">LEAVE</button>
+      </div>
+    </div>
+  
+    </div>
+  </section>
+
+  <section id="screenLoading" class="screen hidden">
+    <h2 class="load-title" id="loadSongTitle">LOADING TRACK</h2>
+    <div class="load-bar"><div id="loadFill"></div></div>
+    <ul class="load-steps" id="loadSteps">
+      <li data-step="fetch">FETCHING MUSIC</li>
+      <li data-step="analyze">ANALYZING RHYTHM</li>
+      <li data-step="colors">EXTRACTING COLORS</li>
+      <li data-step="world">GENERATING WORLD</li>
+      <li data-step="road">PREPARING ROAD</li>
+    </ul>
+    <div class="load-status" id="loadStatus"></div>
+  </section>
+
+  <section id="screenPause" class="screen dimmed hidden">
+    <h2 class="pause-title">PAUSED</h2>
+    <nav class="pause-menu">
+      <button class="mm-btn primary" id="resumeBtn">RESUME</button>
+      <button class="mm-btn" id="restartBtn">RESTART TRACK</button>
+      <button class="mm-btn" id="quitBtn">QUIT TO MENU</button>
+    </nav>
+  </section>
+
+  <section id="screenResults" class="screen dimmed hidden">
+    <h2 class="res-title">RUN COMPLETE</h2>
+    <div class="res-grid">
+      <div class="res-big"><span id="resScore">0</span><label>SCORE</label></div>
+      <div class="res-stats">
+        <div><span id="resMaxCombo">0</span> MAX COMBO</div>
+        <div><span id="resAcc">0%</span> ACCURACY</div>
+        <div class="res-counts">
+          <i class="c-perfect" id="cntPerfect">0</i>
+          <i class="c-great" id="cntGreat">0</i>
+          <i class="c-good" id="cntGood">0</i>
+          <i class="c-miss" id="cntMiss">0</i>
+        </div>
+      </div>
+    </div>
+    <div id="resSong" class="res-song"></div>
+    <nav class="pause-menu">
+      <button class="mm-btn primary" id="againBtn">DRIVE AGAIN</button>
+      <button class="mm-btn" id="resMenuBtn">MAIN MENU</button>
+    </nav>
+  </section>
+
+</div>
+
+<div id="toast" class="hidden"></div>
+<input type="file" id="localFileInput" accept="audio/*" hidden>
+
+<script src="assets/lib/three.min.js"></script>
+<script src="js/core/Events.js"></script>
+<script src="js/core/Config.js"></script>
+<script src="js/core/GameState.js"></script>
+<script src="js/core/GameLoop.js"></script>
+<script src="js/rendering/Renderer.js"></script>
+<script src="js/rendering/CameraSystem.js"></script>
+<script src="js/world/RoadCurve.js"></script>
+<script src="js/music/Track.js"></script>
+<script src="js/music/MusicProvider.js"></script>
+<script src="js/music/ProxyProvider.js"></script>
+<script src="js/music/LocalProvider.js"></script>
+<script src="js/music/QueueManager.js"></script>
+<script src="js/music/MusicManager.js"></script>
+<script src="js/audio/AudioEngine.js"></script>
+<script src="js/audio/AudioAnalyzer.js"></script>
+<script src="js/audio/RhythmTimeline.js"></script>
+<script src="js/world/PaletteSystem.js"></script>
+<script src="js/world/Sky.js"></script>
+<script src="js/world/TimeOfDay.js"></script>
+<script src="js/world/Weather.js"></script>
+<script src="js/world/TrackGenerator.js"></script>
+<script src="js/world/WorldManager.js"></script>
+<script src="js/gameplay/CarModel.js"></script>
+<script src="js/gameplay/PlayerCar.js"></script>
+<script src="js/gameplay/RhythmDirector.js"></script>
+<script src="js/gameplay/TileManager.js"></script>
+<script src="js/gameplay/HitDetector.js"></script>
+<script src="js/gameplay/StuntSystem.js"></script>
+<script src="js/gameplay/ObstacleManager.js"></script>
+<script src="js/gameplay/TrafficSystem.js"></script>
+<script src="js/gameplay/AudioFx.js"></script>
+<script src="js/gameplay/ComboSystem.js"></script>
+<script src="js/gameplay/ScoreSystem.js"></script>
+<script src="js/lyrics/LRCParser.js"></script>
+<script src="js/lyrics/LyricsProvider.js"></script>
+<script src="js/lyrics/LyricsManager.js"></script>
+<script src="js/transition/Wormhole.js"></script>
+<script src="js/multiplayer/NetClient.js"></script>
+<script src="js/multiplayer/MultiplayerManager.js"></script>
+<script src="js/ui/UI.js"></script>
+<script src="js/core/Game.js"></script>
+<script src="js/main.js"></script>
+</body>
+</html>
