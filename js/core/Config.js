@@ -200,7 +200,7 @@
     TILE_HITBOX: { base: 1.0, easy: 1.35, normal: 1.0, hard: 0.85 },
 
     MP: {
-      url: "ws://localhost:9433/mp",
+      url: "wss://neondrive.onrender.com/mp",
       maxPlayers: 4
     },
 
