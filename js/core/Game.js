@@ -193,6 +193,9 @@
           case "KeyC":
             if (this.state.is(ND.State.PLAYING) || this.state.is(ND.State.TRANSITION)) this.cameraSys.cycleMode();
             break;
+          case "KeyR":
+            if (this.state.is(ND.State.PLAYING) || this.state.is(ND.State.TRANSITION)) this.cameraSys.toggleRearView();
+            break;
           case "KeyH": this.car.headlightsOn = !this.car.headlightsOn; break;
           case "Escape":
             if (this.state.is(ND.State.PLAYING)) this.pause();
