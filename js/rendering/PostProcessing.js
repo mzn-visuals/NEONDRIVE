@@ -296,51 +296,32 @@
     render(scene, camera) {
       const renderer = this.renderer.three;
       
-      // Render scene to target
-      renderer.setRenderTarget(this.renderTarget);
-      renderer.render(scene, camera);
-      renderer.setRenderTarget(null);
-      
-      // Apply color grading
-      this.colorGradeMaterial.uniforms.tDiffuse.value = this.renderTarget.texture;
-      renderer.setRenderTarget(this.tempTarget);
-      renderer.clear();
-      this.colorGradeMesh.visible = true;
-      renderer.render(this.colorGradeMesh, this.colorGradeCamera);
-      renderer.setRenderTarget(null);
-      
-      // Apply bloom
-      this.bloomMaterial.uniforms.tDiffuse.value = this.tempTarget.texture;
-      renderer.setRenderTarget(this.renderTarget);
-      renderer.clear();
-      this.bloomMesh.visible = true;
-      renderer.render(this.bloomMesh, this.bloomCamera);
-      renderer.setRenderTarget(null);
-      
-      // Apply motion blur
-      this.motionBlurMaterial.uniforms.tDiffuse.value = this.renderTarget.texture;
-      renderer.setRenderTarget(this.tempTarget);
-      renderer.clear();
-      this.motionBlurMesh.visible = true;
-      renderer.render(this.motionBlurMesh, this.motionBlurCamera);
-      renderer.setRenderTarget(null);
-      
-      // Apply speed lines on top
-      renderer.setRenderTarget(null);
-      renderer.clear();
-      
-      // Render final scene
-      const finalMaterial = new THREE.MeshBasicMaterial({
-        map: this.tempTarget.texture
-      });
-      const finalMesh = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), finalMaterial);
-      const finalCamera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
-      renderer.render(finalMesh, finalCamera);
-      
-      // Render speed lines overlay
-      if (this.speedLinesIntensity > 0.01) {
-        this.speedLinesMesh.visible = true;
-        renderer.render(this.speedLinesMesh, this.speedLinesCamera);
+      try {
+        // Render scene to target
+        renderer.setRenderTarget(this.renderTarget);
+        renderer.clear();
+        renderer.render(scene, camera);
+        
+        // Apply color grading directly to screen
+        renderer.setRenderTarget(null);
+        renderer.clear();
+        
+        if (this.colorGradeMaterial) {
+          this.colorGradeMaterial.uniforms.tDiffuse.value = this.renderTarget.texture;
+          this.colorGradeMesh.visible = true;
+          renderer.render(this.colorGradeMesh, this.colorGradeCamera);
+        }
+        
+        // Render speed lines overlay
+        if (this.speedLinesIntensity > 0.01 && this.speedLinesMesh) {
+          this.speedLinesMesh.visible = true;
+          renderer.render(this.speedLinesMesh, this.speedLinesCamera);
+        }
+      } catch (e) {
+        console.error("Post-processing error:", e);
+        // Fallback to direct rendering
+        renderer.setRenderTarget(null);
+        renderer.render(scene, camera);
       }
     }
     

@@ -649,8 +649,10 @@
         this.skyFollow();
         
         // Update anime effects
-        const carDir = new THREE.Vector3(0, 0, -1).applyQuaternion(this.car.mesh.group.quaternion);
-        this.animeEffects.update(dt, this.car.mesh.group.position, carDir, this.car.speedMs, false);
+        if (this.animeEffects) {
+          const carDir = new THREE.Vector3(0, 0, -1).applyQuaternion(this.car.mesh.group.quaternion);
+          this.animeEffects.update(dt, this.car.mesh.group.position, carDir, this.car.speedMs, false);
+        }
         
         this.renderer.setSpeed(this.car.speedMs);
         this.renderer.render(this.scene, this.camera, dt, ND.loop.elapsed);
@@ -778,13 +780,15 @@
       this.skyFollow();
       
       // Update anime effects
-      const carDir = new THREE.Vector3(0, 0, -1).applyQuaternion(this.car.mesh.group.quaternion);
-      const isDrifting = this.drift && this.drift.isDrifting;
-      this.animeEffects.update(dt, this.car.mesh.group.position, carDir, this.car.speedMs, isDrifting);
-      
-      // Add drift shake
-      if (isDrifting) {
-        this.cameraSys.addDriftShake(Math.abs(this.car.latVel) / 50);
+      if (this.animeEffects) {
+        const carDir = new THREE.Vector3(0, 0, -1).applyQuaternion(this.car.mesh.group.quaternion);
+        const isDrifting = this.drift && this.drift.isDrifting;
+        this.animeEffects.update(dt, this.car.mesh.group.position, carDir, this.car.speedMs, isDrifting);
+        
+        // Add drift shake
+        if (isDrifting) {
+          this.cameraSys.addDriftShake(Math.abs(this.car.latVel) / 50);
+        }
       }
       
       this.renderer.setSpeed(this.car.speedMs);

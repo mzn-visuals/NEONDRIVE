@@ -17,6 +17,7 @@
       this.postProcessing = null;
       this.scene = null;
       this.camera = null;
+      this.usePostProcessing = true;
     }
 
     setQuality(quality) {
@@ -42,9 +43,13 @@
       this.camera = camera;
       this.postProcessing = new ND.PostProcessing(this, scene, camera);
     }
+    
+    enablePostProcessing(enable) {
+      this.usePostProcessing = enable;
+    }
 
     render(scene, camera, dt, time) {
-      if (this.postProcessing) {
+      if (this.usePostProcessing && this.postProcessing) {
         this.postProcessing.update(dt, time);
         this.postProcessing.render(scene, camera);
       } else {
