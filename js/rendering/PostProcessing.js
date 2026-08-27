@@ -297,29 +297,61 @@
       const renderer = this.renderer.three;
       
       try {
-        // Render scene to target
+        // --- Pass 1: Render scene to renderTarget ---
         renderer.setRenderTarget(this.renderTarget);
         renderer.clear();
         renderer.render(scene, camera);
         
-        // Apply color grading directly to screen
+        // --- Pass 2: Bloom (renderTarget → tempTarget) ---
+        if (this.bloomMaterial) {
+          this.bloomMaterial.uniforms.tDiffuse.value = this.renderTarget.texture;
+          renderer.setRenderTarget(this.tempTarget);
+          renderer.clear();
+          renderer.render(this.bloomMesh, this.bloomCamera);
+        }
+        
+        // --- Pass 3: Motion blur (tempTarget → renderTarget) ---
+        if (this.motionBlurStrength > 0.001 && this.motionBlurMaterial) {
+          this.motionBlurMaterial.uniforms.tDiffuse.value = this.tempTarget.texture;
+          renderer.setRenderTarget(this.renderTarget);
+          renderer.clear();
+          renderer.render(this.motionBlurMesh, this.motionBlurCamera);
+          // Color grade reads from renderTarget below (already set)
+        } else {
+          // No motion blur — copy tempTarget back into renderTarget so color grade reads it
+          if (this.bloomMaterial) {
+            // Swap: color grade should read tempTarget
+            this._colorGradeSource = this.tempTarget.texture;
+          } else {
+            this._colorGradeSource = this.renderTarget.texture;
+          }
+        }
+        
+        // --- Pass 4: Color grade → screen ---
         renderer.setRenderTarget(null);
         renderer.clear();
         
         if (this.colorGradeMaterial) {
-          this.colorGradeMaterial.uniforms.tDiffuse.value = this.renderTarget.texture;
+          // If motion blur ran, it wrote to renderTarget; otherwise use tempTarget (bloom output)
+          const source = (this.motionBlurStrength > 0.001 && this.motionBlurMaterial)
+            ? this.renderTarget.texture
+            : (this._colorGradeSource || this.renderTarget.texture);
+          this.colorGradeMaterial.uniforms.tDiffuse.value = source;
           this.colorGradeMesh.visible = true;
           renderer.render(this.colorGradeMesh, this.colorGradeCamera);
         }
         
-        // Render speed lines overlay
+        // --- Pass 5: Speed lines overlay (additive, no clear) ---
         if (this.speedLinesIntensity > 0.01 && this.speedLinesMesh) {
+          renderer.autoClear = false; // FIX: don't wipe the color grade output
           this.speedLinesMesh.visible = true;
           renderer.render(this.speedLinesMesh, this.speedLinesCamera);
+          renderer.autoClear = true;
         }
       } catch (e) {
         console.error("Post-processing error:", e);
         // Fallback to direct rendering
+        renderer.autoClear = true;
         renderer.setRenderTarget(null);
         renderer.render(scene, camera);
       }
