@@ -200,14 +200,14 @@
       const anchor = car.s + 95;
       const sm = curve.sampleAt(anchor);
       const bob = Math.sin(ND.loop.elapsed * 0.9 + p.phase) * 0.35;
-      p.mesh.position.set(sm.x, sm.y + 25 + bob, sm.z);
+      p.mesh.position.set(sm.x, sm.y + 40 + bob, sm.z);
       p.mesh.lookAt(this.cam.position.x, p.mesh.position.y, this.cam.position.z);
 
       const pulseK = this.pulseScale;
       const aspect = p.mat.map.image ? p.mat.map.image.width / p.mat.map.image.height : 4;
-      const h = 7.2;
-      const w = Math.min(h * aspect, 17);
-      p.mesh.scale.set(w * pulseK * 1.4, h * pulseK * 3.0, 1);
+      const h = 25;
+      const w = Math.min(h * aspect, 60);
+      p.mesh.scale.set(w * pulseK, h * pulseK, 1);
 
       if (remaining < -0.4) {
         p.mesh.visible = false;
