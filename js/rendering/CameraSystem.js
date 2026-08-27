@@ -50,7 +50,18 @@
       return this.mode;
     }
     addShake(amount) {
-      this.shake = Math.min(this.shake + amount * this.shakeLevel, 1.2);
+      this.shake = Math.min(this.shake + amount * this.shakeLevel, 2.0);
+    }
+    
+    addImpactShake() {
+      // Dramatic impact shake for anime-style moments
+      this.shake = Math.min(this.shake + 0.8 * this.shakeLevel, 2.5);
+      this.dropKick = Math.min(this.dropKick + 5, 15);
+    }
+    
+    addDriftShake(intensity) {
+      // Subtle shake during drifting
+      this.shake = Math.min(this.shake + intensity * 0.3 * this.shakeLevel, 1.5);
     }
     kickFov(amount) { this.dropKick = Math.min(this.dropKick + amount, 12); }
     setWormBlend(target) { this._wormTarget = target ? 1 : 0; }

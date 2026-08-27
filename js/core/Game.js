@@ -41,8 +41,31 @@
       this.traffic = new ND.TrafficSystem(this.scene, this.curve);
       this.audioFx = new ND.AudioFx(this.music.engine);
 
+      // Initialize post-processing
+      this.renderer.initPostProcessing(this.scene, this.camera);
+      
+      // Initialize anime effects
+      this.animeEffects = new ND.AnimeEffects(this.scene);
+
       this.combo = new ND.ComboSystem();
       this.score = new ND.ScoreSystem();
+      
+      // Listen for combo events for dramatic effects
+      ND.bus.on("combo-tier", (mult, count) => {
+        // Dramatic camera shake on combo tier increase
+        this.cameraSys.addImpactShake();
+        // Emit sparks at combo milestones
+        if (count >= 25 || count >= 50 || count >= 100) {
+          for (let i = 0; i < 10; i++) {
+            setTimeout(() => {
+              const pos = this.car.mesh.group.position.clone();
+              pos.y += 0.5;
+              const dir = new THREE.Vector3(Math.random()-0.5, Math.random(), Math.random()-0.5);
+              this.animeEffects.emitSpark(pos, dir, 1.5);
+            }, i * 50);
+          }
+        }
+      });
 
       this.input = { steer: 0, left: false, right: false, throttle: false, brake: false, drift: false, nitro: false };
       this.padInput = { steer: 0, throttle: 0, brake: 0, drift: false, nitro: false };
@@ -624,12 +647,18 @@
         this.world.update(dt, this.car.s, energy, this.car.speedNorm, this.car.mesh.group.position);
         this.cameraSys.update(dt, this.car, this.curve, "chase");
         this.skyFollow();
-        this.renderer.render(this.scene, this.camera);
+        
+        // Update anime effects
+        const carDir = new THREE.Vector3(0, 0, -1).applyQuaternion(this.car.mesh.group.quaternion);
+        this.animeEffects.update(dt, this.car.mesh.group.position, carDir, this.car.speedMs, false);
+        
+        this.renderer.setSpeed(this.car.speedMs);
+        this.renderer.render(this.scene, this.camera, dt, ND.loop.elapsed);
         return;
       }
 
       if (!this.state.is(ND.State.PLAYING) && !this.state.is(ND.State.TRANSITION)) {
-        this.renderer.render(this.scene, this.camera);
+        this.renderer.render(this.scene, this.camera, dt, ND.loop.elapsed);
         return;
       }
 
@@ -747,7 +776,19 @@
 
       this.cameraSys.update(dt, this.car, this.curve, "chase");
       this.skyFollow();
-      this.renderer.render(this.scene, this.camera);
+      
+      // Update anime effects
+      const carDir = new THREE.Vector3(0, 0, -1).applyQuaternion(this.car.mesh.group.quaternion);
+      const isDrifting = this.drift && this.drift.isDrifting;
+      this.animeEffects.update(dt, this.car.mesh.group.position, carDir, this.car.speedMs, isDrifting);
+      
+      // Add drift shake
+      if (isDrifting) {
+        this.cameraSys.addDriftShake(Math.abs(this.car.latVel) / 50);
+      }
+      
+      this.renderer.setSpeed(this.car.speedMs);
+      this.renderer.render(this.scene, this.camera, dt, ND.loop.elapsed);
     }
 
     skyFollow() {

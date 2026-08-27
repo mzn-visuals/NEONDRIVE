@@ -9,9 +9,14 @@
       });
       this.three.outputEncoding = THREE.sRGBEncoding;
       this.three.toneMapping = THREE.ACESFilmicToneMapping;
-      this.three.toneMappingExposure = 1.12;
+      this.three.toneMappingExposure = 1.15;
       this.setQuality(settings.quality);
       window.addEventListener("resize", () => this.resize());
+      
+      // Post-processing
+      this.postProcessing = null;
+      this.scene = null;
+      this.camera = null;
     }
 
     setQuality(quality) {
@@ -26,11 +31,31 @@
 
     resize() {
       this.three.setSize(window.innerWidth, window.innerHeight);
+      if (this.postProcessing) {
+        this.postProcessing.resize();
+      }
       ND.bus.emit("renderer-resize");
     }
 
-    render(scene, camera) {
-      this.three.render(scene, camera);
+    initPostProcessing(scene, camera) {
+      this.scene = scene;
+      this.camera = camera;
+      this.postProcessing = new ND.PostProcessing(this, scene, camera);
+    }
+
+    render(scene, camera, dt, time) {
+      if (this.postProcessing) {
+        this.postProcessing.update(dt, time);
+        this.postProcessing.render(scene, camera);
+      } else {
+        this.three.render(scene, camera);
+      }
+    }
+    
+    setSpeed(speed) {
+      if (this.postProcessing) {
+        this.postProcessing.setSpeed(speed);
+      }
     }
   }
 
