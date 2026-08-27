@@ -156,12 +156,38 @@
           }
         });
         this.game.scene.add(built.group);
-        ghost = { model: built, s: st.s, lat: st.lat };
+        
+        const canvas = document.createElement('canvas');
+        canvas.width = 256;
+        canvas.height = 64;
+        const ctx = canvas.getContext('2d');
+        ctx.font = 'bold 32px Orbitron, sans-serif';
+        ctx.fillStyle = '#ffffff';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        
+        const texture = new THREE.CanvasTexture(canvas);
+        const spriteMaterial = new THREE.SpriteMaterial({ map: texture, transparent: true });
+        const sprite = new THREE.Sprite(spriteMaterial);
+        sprite.scale.set(4, 1, 1);
+        built.group.add(sprite);
+        
+        ghost = { model: built, s: st.s, lat: st.lat, nameSprite: sprite, nameCtx: ctx, nameTexture: texture };
         this.ghosts.set(st.id, ghost);
       }
       ghost.target = { s: st.s, lat: st.lat, yaw: st.yaw, spd: st.spd, nitro: !!st.nitro };
       const player = (this.net.players || []).find(p => p.id === st.id);
       ghost.name = player ? player.name : "GHOST";
+      
+      if (ghost.nameCtx && ghost.nameTexture) {
+        ghost.nameCtx.clearRect(0, 0, 256, 64);
+        ghost.nameCtx.font = 'bold 32px Orbitron, sans-serif';
+        ghost.nameCtx.fillStyle = '#ffffff';
+        ghost.nameCtx.textAlign = 'center';
+        ghost.nameCtx.textBaseline = 'middle';
+        ghost.nameCtx.fillText(ghost.name, 128, 32);
+        ghost.nameTexture.needsUpdate = true;
+      }
     }
 
     _clearGhosts() {
@@ -191,6 +217,10 @@
         );
         ghost.model.group.rotation.set(0, -(sm.h + (ghost.target.yaw || 0)), 0);
         ghost.model.flame.visible = !!ghost.target.nitro;
+        
+        if (ghost.nameSprite) {
+          ghost.nameSprite.position.set(0, 3, 0);
+        }
       }
     }
 

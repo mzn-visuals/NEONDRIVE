@@ -6,7 +6,7 @@
 <title>NEON//DRIVE</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;900&family=Rajdhani:wght@500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Orbitron:wght@500;700;900&family=Rajdhani:wght@500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="css/main.css">
 <link rel="stylesheet" href="css/menu.css">
 <link rel="stylesheet" href="css/hud.css">
@@ -167,8 +167,12 @@
     <div class="coop-body">
       <div class="coop-status" id="coopStatus">Connect to the co-op server to drive with friends. Same song, same world, same beat — ghost cars, team combos, shared wormholes.</div>
       <div class="coop-actions" id="coopActions">
-        <button id="coopHostBtn" class="neon-btn">HOST A RUN</button>
+        <div class="coop-host">
+          <input id="coopUsernameInput" type="text" maxlength="12" placeholder="USERNAME">
+          <button id="coopHostBtn" class="neon-btn">HOST A RUN</button>
+        </div>
         <div class="coop-join">
+          <input id="coopJoinUsernameInput" type="text" maxlength="12" placeholder="USERNAME">
           <input id="coopCodeInput" type="text" maxlength="4" placeholder="CODE">
           <button id="coopJoinBtn" class="neon-btn ghost">JOIN</button>
         </div>

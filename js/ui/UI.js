@@ -403,20 +403,22 @@
 
     _bindCoopScreen() {
       $("coopHostBtn").addEventListener("click", async () => {
+        const username = $("coopUsernameInput").value.trim().toUpperCase() || "DRIVER";
         $("coopStatus").textContent = "CONNECTING…";
         try {
-          const code = await this.game.mp.host("DRIVER", this.settings.carIndex || 0);
+          const code = await this.game.mp.host(username, this.settings.carIndex || 0);
           this._enterCoopRoom(code, true);
         } catch (e) {
           $("coopStatus").textContent = "CO-OP SERVER UNREACHABLE — start it with: node multiplayer/server.js";
         }
       });
       $("coopJoinBtn").addEventListener("click", async () => {
+        const username = $("coopJoinUsernameInput").value.trim().toUpperCase() || "DRIVER";
         const code = $("coopCodeInput").value.trim().toUpperCase();
         if (code.length !== 4) { $("coopStatus").textContent = "ENTER A 4-LETTER ROOM CODE"; return; }
         $("coopStatus").textContent = "CONNECTING…";
         try {
-          await this.game.mp.join(code, "DRIVER", this.settings.carIndex || 0);
+          await this.game.mp.join(code, username, this.settings.carIndex || 0);
           this._enterCoopRoom(code, false);
         } catch (e) {
           $("coopStatus").textContent = "JOIN FAILED — " + e.message.toUpperCase();

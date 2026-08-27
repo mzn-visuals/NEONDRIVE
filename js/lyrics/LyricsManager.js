@@ -73,8 +73,9 @@
       ctx.textBaseline = "middle";
 
       const cssMain = this.palette.cssPrimary || "#ff2fd6";
+      text = text.toUpperCase();
       let fontSize = text.length > 34 ? 96 : text.length > 20 ? 128 : 156;
-      ctx.font = `900 ${fontSize}px Orbitron, Rajdhani, sans-serif`;
+      ctx.font = `900 ${fontSize}px 'Bebas Neue', sans-serif`;
 
       let lines = [text];
       if (ctx.measureText(text).width > c.width * 0.92) {
@@ -83,7 +84,7 @@
         let li = 0;
         for (const w of words) {
           const test = lines[li] ? lines[li] + " " + w : w;
-          ctx.font = `900 ${fontSize}px Orbitron, Rajdhani, sans-serif`;
+          ctx.font = `900 ${fontSize}px 'Bebas Neue', sans-serif`;
           if (ctx.measureText(test).width > c.width * 0.88 && lines[li]) {
             li++;
             if (li > 1) break;
@@ -93,7 +94,7 @@
         fontSize = Math.max(72, Math.floor(fontSize * 0.78));
       }
 
-      ctx.font = `900 ${fontSize}px Orbitron, Rajdhani, sans-serif`;
+      ctx.font = `900 ${fontSize}px 'Bebas Neue', sans-serif`;
       const lh = fontSize * 1.14;
       const startY = c.height / 2 - ((lines.length - 1) * lh) / 2;
 
@@ -199,14 +200,14 @@
       const anchor = car.s + 95;
       const sm = curve.sampleAt(anchor);
       const bob = Math.sin(ND.loop.elapsed * 0.9 + p.phase) * 0.35;
-      p.mesh.position.set(sm.x, sm.y + 10.5 + bob, sm.z);
+      p.mesh.position.set(sm.x, sm.y + 25 + bob, sm.z);
       p.mesh.lookAt(this.cam.position.x, p.mesh.position.y, this.cam.position.z);
 
       const pulseK = this.pulseScale;
       const aspect = p.mat.map.image ? p.mat.map.image.width / p.mat.map.image.height : 4;
       const h = 7.2;
       const w = Math.min(h * aspect, 17);
-      p.mesh.scale.set(w * pulseK, h * pulseK, 1);
+      p.mesh.scale.set(w * pulseK * 1.4, h * pulseK * 3.0, 1);
 
       if (remaining < -0.4) {
         p.mesh.visible = false;
