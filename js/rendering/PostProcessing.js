@@ -44,7 +44,10 @@
     }
     
     initSpeedLines() {
-      // Speed lines shader - manga-style radial lines
+      // Speed lines shader - proper anime/Initial D style:
+      // Dark radial streaks radiating FROM the edges TOWARD the car (screen center).
+      // A clear hole in the middle keeps the subject visible.
+      // Lines only exist in the vignette ring near the screen edges.
       const speedLinesVertexShader = `
         varying vec2 vUv;
         void main() {
@@ -60,39 +63,61 @@
         uniform vec2 resolution;
         varying vec2 vUv;
         
-        float random(vec2 st) {
-          return fract(sin(dot(st.xy, vec2(12.9898, 78.233))) * 43758.5453123);
+        // Deterministic hash — stable per-line, only flickers on integer step
+        float hash(float n) {
+          return fract(sin(n * 127.1 + 311.7) * 43758.5453);
         }
         
         void main() {
-          vec2 uv = vUv;
-          vec2 center = vec2(0.5);
-          vec2 dir = uv - center;
-          float dist = length(dir);
-          float angle = atan(dir.y, dir.x);
+          // Aspect-correct UV so the clear center hole is a circle, not an ellipse
+          float aspect = resolution.x / resolution.y;
+          vec2 uv = vUv - 0.5;
+          uv.x *= aspect;
           
-          // Create radial speed lines
-          float lines = 0.0;
-          float numLines = 40.0;
+          float dist  = length(uv);                    // 0 at center, grows outward
+          float angle = atan(uv.y, uv.x);              // -PI..PI around center
           
-          for (float i = 0.0; i < numLines; i++) {
-            float lineAngle = (i / numLines) * 6.28318 + time * 0.5;
-            float angleDiff = abs(angle - lineAngle);
-            if (angleDiff > 3.14159) angleDiff = 6.28318 - angleDiff;
-            
-            float line = smoothstep(0.02, 0.0, angleDiff) * smoothstep(0.5, 0.3, dist);
-            float flicker = random(vec2(i, time * 10.0)) * 0.5 + 0.5;
-            lines += line * flicker;
-          }
+          // ── Vignette ring ─────────────────────────────────────────────────────
+          // Lines only live in the outer ring: innerRadius..1.0 (normalised to max corner dist)
+          float maxDist    = length(vec2(aspect * 0.5, 0.5)); // corner distance
+          float normDist   = dist / maxDist;                  // 0..1
+          float innerEdge  = 0.35;   // clear hole radius (car stays visible)
+          float outerEdge  = 0.72;   // lines fade in fully by here
           
-          // Add motion streaks
-          float streak = smoothstep(0.0, 0.3, dist) * smoothstep(0.5, 0.3, dist);
-          streak *= sin(dist * 20.0 - time * 5.0) * 0.5 + 0.5;
+          // Fade: 0 inside hole, ramps up in the band, full at outer edge
+          float ringMask = smoothstep(innerEdge, outerEdge, normDist);
+          // Also fade slightly near the very corners so it doesn't look like a box
+          float cornerFade = 1.0 - smoothstep(0.88, 1.0, normDist);
+          ringMask *= cornerFade;
           
-          vec3 color = vec3(lines * intensity * 0.8);
-          color += vec3(streak * intensity * 0.3);
+          // ── Radial line pattern ───────────────────────────────────────────────
+          float NUM_LINES = 60.0;
+          // Quantise angle into sectors; add a slow time drift for animation
+          float sector    = (angle / 6.28318) * NUM_LINES;   // 0..NUM_LINES
+          float sectorI   = floor(sector);                    // which line
+          float sectorF   = fract(sector);                    // position within sector
           
-          gl_FragColor = vec4(color, lines * intensity * 0.6 + streak * intensity * 0.2);
+          // Per-line randomness: width and opacity flicker (slow step, no strobing)
+          float timeStepped = floor(time * 8.0);              // flicker ~8fps
+          float lineWidth   = 0.08 + 0.22 * hash(sectorI * 3.7 + timeStepped * 0.1);
+          float lineOpacity = 0.5  + 0.5  * hash(sectorI * 1.3 + timeStepped * 0.17);
+          
+          // Sharp-edged line within its sector (smoothstep gives the tapered edge look)
+          float halfW = lineWidth * 0.5;
+          float line  = smoothstep(halfW, halfW * 0.3, abs(sectorF - 0.5));
+          
+          // ── Length variation ─────────────────────────────────────────────────
+          // Each line has a random inner cutoff so they don't all start at the same radius
+          float lineStart = innerEdge + 0.05 * hash(sectorI * 2.1);
+          float lineMask  = smoothstep(lineStart, lineStart + 0.06, normDist);
+          
+          // ── Compose ──────────────────────────────────────────────────────────
+          float alpha = line * lineOpacity * ringMask * lineMask * intensity;
+          
+          // Dark lines (manga style): near-black, slight blue tint for the night racing feel
+          vec3 lineColor = vec3(0.02, 0.02, 0.06);
+          
+          gl_FragColor = vec4(lineColor, alpha);
         }
       `;
       
