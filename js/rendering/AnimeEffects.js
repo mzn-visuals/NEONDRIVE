@@ -67,58 +67,67 @@
     }
     
     initAirStreams() {
-      // White air streams behind cars (Initial D style)
-      const streamGeometry = new THREE.BufferGeometry();
-      const positions = new Float32Array(this.maxAirStreams * 6); // 2 points per line
-      const velocities = new Float32Array(this.maxAirStreams * 3);
-      const lifetimes = new Float32Array(this.maxAirStreams);
-      const widths = new Float32Array(this.maxAirStreams);
-      
-      streamGeometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-      streamGeometry.setAttribute('velocity', new THREE.BufferAttribute(velocities, 3));
-      streamGeometry.setAttribute('lifetime', new THREE.BufferAttribute(lifetimes, 1));
-      streamGeometry.setAttribute('width', new THREE.BufferAttribute(widths, 1));
-      
-      const streamMaterial = new THREE.ShaderMaterial({
-        uniforms: {
-          time: { value: 0 }
-        },
+      // ── In-world speed lines (Initial D / anime style) ─────────────────────
+      // White streaks that spawn alongside the car and fly backward past it,
+      // giving the impression of high-speed rushing through the environment.
+      // Lines are arranged in lateral rows at road level on both sides.
+      const MAX = this.maxAirStreams;
+      const positions  = new Float32Array(MAX * 6); // 2 verts per line segment
+      const alphas     = new Float32Array(MAX);      // per-line alpha
+      const lifetimes  = new Float32Array(MAX);
+
+      const geo = new THREE.BufferGeometry();
+      geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+      geo.setAttribute('alpha',    new THREE.BufferAttribute(alphas, 1));
+      geo.setAttribute('lifetime', new THREE.BufferAttribute(lifetimes, 1));
+
+      const mat = new THREE.ShaderMaterial({
         vertexShader: `
           attribute float lifetime;
-          attribute float width;
+          attribute float alpha;
+          varying float vAlpha;
           varying float vLifetime;
-          varying float vWidth;
-          
           void main() {
+            vAlpha    = alpha;
             vLifetime = lifetime;
-            vWidth = width;
             gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
           }
         `,
         fragmentShader: `
-          uniform float time;
+          varying float vAlpha;
           varying float vLifetime;
-          varying float vWidth;
-          
           void main() {
-            float alpha = (1.0 - vLifetime) * 0.6;
-            vec3 color = vec3(0.95, 0.97, 1.0);
-            gl_FragColor = vec4(color, alpha);
+            // Fade in fast, linger, then fade out at end of life
+            float fade = smoothstep(0.0, 0.12, vLifetime) * smoothstep(1.0, 0.7, vLifetime);
+            gl_FragColor = vec4(1.0, 1.0, 1.0, vAlpha * fade);
           }
         `,
         transparent: true,
         depthWrite: false,
+        depthTest: true,
         blending: THREE.AdditiveBlending
       });
-      
-      this.airStreamSystem = new THREE.LineSegments(streamGeometry, streamMaterial);
+
+      this.airStreamSystem = new THREE.LineSegments(geo, mat);
       this.airStreamSystem.visible = false;
+      this.airStreamSystem.frustumCulled = false; // always render — it's right beside the camera
       this.scene.add(this.airStreamSystem);
-      
-      // Initialize air stream data
-      for (let i = 0; i < this.maxAirStreams; i++) {
-        lifetimes[i] = 1.0; // Dead
-        widths[i] = 0.0;
+
+      // Runtime state stored separately (geometry arrays are write-only from GPU side)
+      this._streams = [];
+      for (let i = 0; i < MAX; i++) {
+        lifetimes[i] = 0;
+        alphas[i]    = 0;
+        this._streams.push({
+          alive:    false,
+          life:     0,  // 0..1
+          // world-space start and end of the streak
+          x0: 0, y0: 0, z0: 0,
+          x1: 0, y1: 0, z1: 0,
+          // velocity (world-space, moves the whole line each frame)
+          vx: 0, vz: 0,
+          alpha: 0,
+        });
       }
     }
     
@@ -150,36 +159,53 @@
     }
     
     emitAirStream(carPosition, carDirection, speed) {
-      if (speed < 30) return; // Only at high speeds
-      
-      const positions = this.airStreamSystem.geometry.attributes.position.array;
-      const velocities = this.airStreamSystem.geometry.attributes.velocity.array;
-      const lifetimes = this.airStreamSystem.geometry.attributes.lifetime.array;
-      const widths = this.airStreamSystem.geometry.attributes.width.array;
-      
-      // Find dead stream
-      for (let i = 0; i < this.maxAirStreams; i++) {
-        if (lifetimes[i] >= 1.0) {
-          lifetimes[i] = 0.0;
-          
-          // Start point (behind car)
-          const offset = -2.0;
-          positions[i * 6] = carPosition.x + carDirection.x * offset;
-          positions[i * 6 + 1] = carPosition.y + 0.3;
-          positions[i * 6 + 2] = carPosition.z + carDirection.z * offset;
-          
-          // End point (further behind)
-          const length = 3.0 + speed * 0.02;
-          positions[i * 6 + 3] = carPosition.x + carDirection.x * (offset - length);
-          positions[i * 6 + 4] = carPosition.y + 0.3;
-          positions[i * 6 + 5] = carPosition.z + carDirection.z * (offset - length);
-          
-          // Velocity (move backward)
-          velocities[i * 3] = -carDirection.x * speed * 0.5;
-          velocities[i * 3 + 1] = 0;
-          velocities[i * 3 + 2] = -carDirection.z * speed * 0.5;
-          
-          widths[i] = 0.1 + speed * 0.001;
+      if (speed < 40) return;
+
+      // Perpendicular to car direction (left/right of road)
+      const perpX =  carDirection.z;
+      const perpZ = -carDirection.x;
+
+      // Spawn lines on both sides in 2 lateral slots each
+      const SLOTS = [
+        { side: -1, lateral: 1.6 + Math.random() * 1.2 },
+        { side:  1, lateral: 1.6 + Math.random() * 1.2 },
+      ];
+
+      for (const slot of SLOTS) {
+        // Find a dead slot
+        for (let i = 0; i < this.maxAirStreams; i++) {
+          const s = this._streams[i];
+          if (s.alive) continue;
+
+          // Streak length scales with speed (faster = longer lines, more dramatic)
+          const len = 2.5 + speed * 0.045;
+
+          // Lateral offset from car centre
+          const lx = perpX * slot.lateral * slot.side;
+          const lz = perpZ * slot.lateral * slot.side;
+
+          // Slight vertical scatter (low to ground)
+          const hy = 0.1 + Math.random() * 0.35;
+
+          // Spawn just ahead of the car so it flies backward through frame
+          const aheadBias = 1.5;
+          const sx = carPosition.x + carDirection.x * aheadBias + lx;
+          const sz = carPosition.z + carDirection.z * aheadBias + lz;
+          const ex = sx - carDirection.x * len;
+          const ez = sz - carDirection.z * len;
+
+          s.alive = true;
+          s.life  = 0;
+          s.x0 = sx; s.y0 = carPosition.y + hy; s.z0 = sz;
+          s.x1 = ex; s.y1 = carPosition.y + hy; s.z1 = ez;
+
+          // Move backward at roughly car speed so the streak flies past
+          s.vx = -carDirection.x * (speed * 0.9 + 5);
+          s.vz = -carDirection.z * (speed * 0.9 + 5);
+
+          // Alpha scales with speed (subtle at 40, strong at 150+)
+          s.alpha = Math.min((speed - 40) / 120, 1.0) * (0.55 + Math.random() * 0.45);
+
           this.airStreamSystem.visible = true;
           break;
         }
@@ -215,31 +241,49 @@
         this.sparkSystem.visible = activeCount > 0;
       }
       
-      // Update air streams
-      if (this.airStreamSystem.visible) {
-        const positions = this.airStreamSystem.geometry.attributes.position.array;
-        const velocities = this.airStreamSystem.geometry.attributes.velocity.array;
-        const lifetimes = this.airStreamSystem.geometry.attributes.lifetime.array;
-        
+      // Update in-world speed-line streaks
+      {
+        const posArr  = this.airStreamSystem.geometry.attributes.position.array;
+        const alpArr  = this.airStreamSystem.geometry.attributes.alpha.array;
+        const lifArr  = this.airStreamSystem.geometry.attributes.lifetime.array;
+
         let activeCount = 0;
         for (let i = 0; i < this.maxAirStreams; i++) {
-          if (lifetimes[i] < 1.0) {
-            lifetimes[i] += dt * 1.5;
-            
-            // Move both points
-            positions[i * 6] += velocities[i * 3] * dt;
-            positions[i * 6 + 1] += velocities[i * 3 + 1] * dt;
-            positions[i * 6 + 2] += velocities[i * 3 + 2] * dt;
-            positions[i * 6 + 3] += velocities[i * 3] * dt;
-            positions[i * 6 + 4] += velocities[i * 3 + 1] * dt;
-            positions[i * 6 + 5] += velocities[i * 3 + 2] * dt;
-            
-            activeCount++;
+          const s = this._streams[i];
+          if (!s.alive) {
+            // Park off-screen so the LineSegments draw call skips it visually
+            posArr[i * 6] = posArr[i * 6 + 3] = 0;
+            posArr[i * 6 + 1] = posArr[i * 6 + 4] = -9999;
+            posArr[i * 6 + 2] = posArr[i * 6 + 5] = 0;
+            lifArr[i] = 0;
+            alpArr[i] = 0;
+            continue;
           }
+
+          // Advance life (each streak lives ~0.18s at 60fps)
+          s.life += dt * 5.5;
+          if (s.life >= 1.0) {
+            s.alive = false;
+            continue;
+          }
+
+          // Translate both endpoints by velocity
+          s.x0 += s.vx * dt;
+          s.z0 += s.vz * dt;
+          s.x1 += s.vx * dt;
+          s.z1 += s.vz * dt;
+
+          // Write to geometry buffer
+          posArr[i * 6]     = s.x0; posArr[i * 6 + 1] = s.y0; posArr[i * 6 + 2] = s.z0;
+          posArr[i * 6 + 3] = s.x1; posArr[i * 6 + 4] = s.y1; posArr[i * 6 + 5] = s.z1;
+          lifArr[i] = s.life;
+          alpArr[i] = s.alpha;
+          activeCount++;
         }
-        
+
         this.airStreamSystem.geometry.attributes.position.needsUpdate = true;
         this.airStreamSystem.geometry.attributes.lifetime.needsUpdate = true;
+        this.airStreamSystem.geometry.attributes.alpha.needsUpdate = true;
         this.airStreamSystem.visible = activeCount > 0;
       }
       
@@ -256,9 +300,13 @@
         this.emitSpark(sparkPos, sparkDir, 1.0);
       }
       
-      // Emit air streams at high speed
-      if (Math.random() < 0.1) {
-        this.emitAirStream(carPosition, carDirection, carSpeed);
+      // Emit speed-line streaks — rate scales with speed
+      if (carSpeed >= 40) {
+        // At 40kmh: ~1 pair/frame at 10fps, at 150kmh: ~4 pairs/frame at 60fps
+        const emitCount = Math.ceil(Math.min(carSpeed / 50, 4));
+        for (let _e = 0; _e < emitCount; _e++) {
+          this.emitAirStream(carPosition, carDirection, carSpeed);
+        }
       }
       
       // Update shader time

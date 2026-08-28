@@ -5,15 +5,14 @@
       this.scene = scene;
       this.camera = camera;
       this.composer = null;
-      this.speedLinesPass = null;
+      // speedLines moved to AnimeEffects
       this.bloomPass = null;
       this.colorGradePass = null;
       this.motionBlurPass = null;
       
       this.speed = 0;
       this.targetSpeed = 0;
-      this.speedLinesIntensity = 0;
-      this.bloomIntensity = 1.5;
+      this.bloomIntensity = 0.6;
       this.motionBlurStrength = 0;
       
       this.init();
@@ -37,112 +36,13 @@
       });
       
       // Initialize passes
-      this.initSpeedLines();
+      // Speed lines moved to AnimeEffects.js (in-world 3D geometry)
       this.initBloom();
       this.initColorGrading();
       this.initMotionBlur();
     }
     
-    initSpeedLines() {
-      // Speed lines shader - proper anime/Initial D style:
-      // Dark radial streaks radiating FROM the edges TOWARD the car (screen center).
-      // A clear hole in the middle keeps the subject visible.
-      // Lines only exist in the vignette ring near the screen edges.
-      const speedLinesVertexShader = `
-        varying vec2 vUv;
-        void main() {
-          vUv = uv;
-          gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-        }
-      `;
-      
-      const speedLinesFragmentShader = `
-        uniform float time;
-        uniform float intensity;
-        uniform float speed;
-        uniform vec2 resolution;
-        varying vec2 vUv;
-        
-        // Deterministic hash — stable per-line, only flickers on integer step
-        float hash(float n) {
-          return fract(sin(n * 127.1 + 311.7) * 43758.5453);
-        }
-        
-        void main() {
-          // Aspect-correct UV so the clear center hole is a circle, not an ellipse
-          float aspect = resolution.x / resolution.y;
-          vec2 uv = vUv - 0.5;
-          uv.x *= aspect;
-          
-          float dist  = length(uv);                    // 0 at center, grows outward
-          float angle = atan(uv.y, uv.x);              // -PI..PI around center
-          
-          // ── Vignette ring ─────────────────────────────────────────────────────
-          // Lines only live in the outer ring: innerRadius..1.0 (normalised to max corner dist)
-          float maxDist    = length(vec2(aspect * 0.5, 0.5)); // corner distance
-          float normDist   = dist / maxDist;                  // 0..1
-          float innerEdge  = 0.35;   // clear hole radius (car stays visible)
-          float outerEdge  = 0.72;   // lines fade in fully by here
-          
-          // Fade: 0 inside hole, ramps up in the band, full at outer edge
-          float ringMask = smoothstep(innerEdge, outerEdge, normDist);
-          // Also fade slightly near the very corners so it doesn't look like a box
-          float cornerFade = 1.0 - smoothstep(0.88, 1.0, normDist);
-          ringMask *= cornerFade;
-          
-          // ── Radial line pattern ───────────────────────────────────────────────
-          float NUM_LINES = 60.0;
-          // Quantise angle into sectors; add a slow time drift for animation
-          float sector    = (angle / 6.28318) * NUM_LINES;   // 0..NUM_LINES
-          float sectorI   = floor(sector);                    // which line
-          float sectorF   = fract(sector);                    // position within sector
-          
-          // Per-line randomness: width and opacity flicker (slow step, no strobing)
-          float timeStepped = floor(time * 8.0);              // flicker ~8fps
-          float lineWidth   = 0.08 + 0.22 * hash(sectorI * 3.7 + timeStepped * 0.1);
-          float lineOpacity = 0.5  + 0.5  * hash(sectorI * 1.3 + timeStepped * 0.17);
-          
-          // Sharp-edged line within its sector (smoothstep gives the tapered edge look)
-          float halfW = lineWidth * 0.5;
-          float line  = smoothstep(halfW, halfW * 0.3, abs(sectorF - 0.5));
-          
-          // ── Length variation ─────────────────────────────────────────────────
-          // Each line has a random inner cutoff so they don't all start at the same radius
-          float lineStart = innerEdge + 0.05 * hash(sectorI * 2.1);
-          float lineMask  = smoothstep(lineStart, lineStart + 0.06, normDist);
-          
-          // ── Compose ──────────────────────────────────────────────────────────
-          float alpha = line * lineOpacity * ringMask * lineMask * intensity;
-          
-          // Dark lines (manga style): near-black, slight blue tint for the night racing feel
-          vec3 lineColor = vec3(0.02, 0.02, 0.06);
-          
-          gl_FragColor = vec4(lineColor, alpha);
-        }
-      `;
-      
-      this.speedLinesMaterial = new THREE.ShaderMaterial({
-        uniforms: {
-          time: { value: 0 },
-          intensity: { value: 0 },
-          speed: { value: 0 },
-          resolution: { value: new THREE.Vector2(window.innerWidth, window.innerHeight) }
-        },
-        vertexShader: speedLinesVertexShader,
-        fragmentShader: speedLinesFragmentShader,
-        transparent: true,
-        depthWrite: false,
-        depthTest: false
-      });
-      
-      this.speedLinesMesh = new THREE.Mesh(
-        new THREE.PlaneGeometry(2, 2),
-        this.speedLinesMaterial
-      );
-      this.speedLinesCamera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
-    }
-    
-    initBloom() {
+    initBloom    initBloom() {
       // Simple bloom effect
       const bloomVertexShader = `
         varying vec2 vUv;
@@ -155,20 +55,24 @@
       const bloomFragmentShader = `
         uniform sampler2D tDiffuse;
         uniform float intensity;
+        uniform vec2 resolution;
         varying vec2 vUv;
         
         void main() {
           vec4 color = texture2D(tDiffuse, vUv);
           
-          // Simple glow
-          vec2 offset = vec2(1.0 / 512.0);
+          // Resolution-relative offset (hardcoded 1/512 blew out at low render target sizes)
+          vec2 offset = vec2(1.5) / resolution;
           vec4 glow = vec4(0.0);
           glow += texture2D(tDiffuse, vUv + offset) * 0.25;
           glow += texture2D(tDiffuse, vUv - offset) * 0.25;
           glow += texture2D(tDiffuse, vUv + vec2(offset.x, -offset.y)) * 0.25;
           glow += texture2D(tDiffuse, vUv + vec2(-offset.x, offset.y)) * 0.25;
           
+          // Threshold: only bloom genuinely bright pixels, not flat road/ground
+          float lum = dot(color.rgb, vec3(0.299, 0.587, 0.114));
           glow = max(glow - color, 0.0) * intensity;
+          glow *= smoothstep(0.62, 0.85, lum);
           
           gl_FragColor = color + glow;
         }
@@ -177,7 +81,8 @@
       this.bloomMaterial = new THREE.ShaderMaterial({
         uniforms: {
           tDiffuse: { value: null },
-          intensity: { value: this.bloomIntensity }
+          intensity: { value: this.bloomIntensity },
+          resolution: { value: new THREE.Vector2(window.innerWidth, window.innerHeight) }
         },
         vertexShader: bloomVertexShader,
         fragmentShader: bloomFragmentShader
@@ -300,18 +205,8 @@
       this.speed += (this.targetSpeed - this.speed) * 5.0 * dt;
       
       // Calculate speed lines intensity based on speed
-      const targetIntensity = Math.min(this.speed / 100.0, 1.0);
-      this.speedLinesIntensity += (targetIntensity - this.speedLinesIntensity) * 3.0 * dt;
-      
-      // Update speed lines
-      if (this.speedLinesMaterial) {
-        this.speedLinesMaterial.uniforms.time.value = time;
-        this.speedLinesMaterial.uniforms.intensity.value = this.speedLinesIntensity;
-        this.speedLinesMaterial.uniforms.speed.value = this.speed;
-      }
-      
       // Update motion blur
-      const targetMotionBlur = Math.min(this.speed / 150.0, 0.03);
+      const targetMotionBlur = this.speed > 120 ? Math.min((this.speed - 120) / 200.0, 0.018) : 0;
       this.motionBlurStrength += (targetMotionBlur - this.motionBlurStrength) * 2.0 * dt;
       if (this.motionBlurMaterial) {
         this.motionBlurMaterial.uniforms.strength.value = this.motionBlurStrength;
@@ -365,14 +260,6 @@
           this.colorGradeMesh.visible = true;
           renderer.render(this.colorGradeMesh, this.colorGradeCamera);
         }
-        
-        // --- Pass 5: Speed lines overlay (additive, no clear) ---
-        if (this.speedLinesIntensity > 0.01 && this.speedLinesMesh) {
-          renderer.autoClear = false; // FIX: don't wipe the color grade output
-          this.speedLinesMesh.visible = true;
-          renderer.render(this.speedLinesMesh, this.speedLinesCamera);
-          renderer.autoClear = true;
-        }
       } catch (e) {
         console.error("Post-processing error:", e);
         // Fallback to direct rendering
@@ -389,8 +276,8 @@
       this.renderTarget.setSize(width, height);
       this.tempTarget.setSize(width, height);
       
-      if (this.speedLinesMaterial) {
-        this.speedLinesMaterial.uniforms.resolution.value.set(width, height);
+      if (this.bloomMaterial) {
+        this.bloomMaterial.uniforms.resolution.value.set(width, height);
       }
     }
   }
