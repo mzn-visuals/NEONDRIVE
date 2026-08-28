@@ -313,9 +313,7 @@
       if (this.sparkSystem.material.uniforms) {
         this.sparkSystem.material.uniforms.time.value = time;
       }
-      if (this.airStreamSystem.material.uniforms) {
-        this.airStreamSystem.material.uniforms.time.value = time;
-      }
+      // airStreamSystem shader has no time uniform (removed in rewrite)
     }
   }
   
