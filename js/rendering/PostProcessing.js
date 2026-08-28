@@ -42,7 +42,7 @@
       this.initMotionBlur();
     }
     
-    initBloom    initBloom() {
+    initBloom() {
       // Simple bloom effect
       const bloomVertexShader = `
         varying vec2 vUv;
